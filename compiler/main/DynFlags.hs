@@ -688,6 +688,7 @@ data GeneralFlag
    | Opt_HexWordLiterals -- See Note [Print Hexadecimal Literals]
 
    | Opt_InfoTableMap
+   | Opt_DistinctConstructorTables
 
    -- Suppress all coercions, them replacing with '...'
    | Opt_SuppressCoercions
@@ -3769,6 +3770,9 @@ dynamic_flags_deps = [
       (noArg (\d -> d { profAuto = ProfAutoCalls } ))
   , make_ord_flag defGhcFlag "fno-prof-auto"
       (noArg (\d -> d { profAuto = NoProfAuto } ))
+
+  , make_ord_flag defGhcFlag "fdistinct-constructor-tables"
+      (NoArg (setGeneralFlag Opt_DistinctConstructorTables))
 
   , make_ord_flag defGhcFlag "finfo-table-map"
       (NoArg (setGeneralFlag Opt_InfoTableMap))

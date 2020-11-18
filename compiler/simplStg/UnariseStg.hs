@@ -288,9 +288,9 @@ unariseRhs rho (StgRhsClosure ext ccs update_flag args expr)
        expr' <- unariseExpr rho' expr
        return (StgRhsClosure ext ccs update_flag args1 expr')
 
-unariseRhs rho (StgRhsCon ccs con args)
+unariseRhs rho (StgRhsCon ccs con mn ts args)
   = ASSERT(not (isUnboxedTupleCon con || isUnboxedSumCon con))
-    return (StgRhsCon ccs con (unariseConArgs rho args))
+    return (StgRhsCon ccs con mn ts (unariseConArgs rho args))
 
 --------------------------------------------------------------------------------
 
@@ -320,13 +320,13 @@ unariseExpr rho e@(StgApp f args)
 unariseExpr _ (StgLit l)
   = return (StgLit l)
 
-unariseExpr rho (StgConApp dc args ty_args)
+unariseExpr rho (StgConApp dc n args ty_args)
   | Just args' <- unariseMulti_maybe rho dc args ty_args
   = return (mkTuple args')
 
   | otherwise
   , let args' = unariseConArgs rho args
-  = return (StgConApp dc args' (map stgArgType args'))
+  = return (StgConApp dc n args' (map stgArgType args'))
 
 unariseExpr rho (StgOpApp op args ty)
   = return (StgOpApp op (unariseFunArgs rho args) ty)
@@ -343,7 +343,7 @@ unariseExpr rho (StgCase scrut bndr alt_ty alts)
   -- Handle strict lets for tuples and sums:
   --   case (# a,b #) of r -> rhs
   -- and analogously for sums
-  | StgConApp dc args ty_args <- scrut
+  | StgConApp dc _n args ty_args <- scrut
   , Just args' <- unariseMulti_maybe rho dc args ty_args
   = elimCase rho args' bndr alt_ty alts
 
@@ -746,7 +746,7 @@ isUnboxedTupleBndr :: Id -> Bool
 isUnboxedTupleBndr = isUnboxedTupleType . idType
 
 mkTuple :: [StgArg] -> StgExpr
-mkTuple args = StgConApp (tupleDataCon Unboxed (length args)) args (map stgArgType args)
+mkTuple args = StgConApp (tupleDataCon Unboxed (length args)) Nothing args (map stgArgType args)
 
 tagAltTy :: AltType
 tagAltTy = PrimAlt IntRep

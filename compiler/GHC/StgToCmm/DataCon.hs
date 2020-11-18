@@ -1,3 +1,4 @@
+{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE CPP #-}
 
 -----------------------------------------------------------------------------
@@ -60,9 +61,10 @@ import Data.Char
 cgTopRhsCon :: DynFlags
             -> Id               -- Name of thing bound to this RHS
             -> DataCon          -- Id
+            -> Maybe Int
             -> [NonVoid StgArg] -- Args
             -> (CgIdInfo, FCode ())
-cgTopRhsCon dflags id con args =
+cgTopRhsCon dflags id con mn args =
     let id_info = litIdInfo dflags id (mkConLFInfo con) (CmmLabel closure_label)
     in (id_info, gen_code)
   where
@@ -96,7 +98,7 @@ cgTopRhsCon dflags id con args =
              -- we're not really going to emit an info table, so having
              -- to make a CmmInfoTable is a bit overkill, but mkStaticClosureFields
              -- needs to poke around inside it.
-            info_tbl = mkDataConInfoTable dflags con True ptr_wds nonptr_wds
+            info_tbl = mkDataConInfoTable dflags con ((this_mod,) <$> mn) True ptr_wds nonptr_wds
 
 
         ; payload <- mapM mk_payload nv_args_w_offsets
@@ -112,9 +114,10 @@ cgTopRhsCon dflags id con args =
                              payload
 
                 -- BUILD THE OBJECT
-        ; emitDataLits closure_label closure_rep
+            -- We're generating info tables, so we don't know and care about
+            -- what the actual arguments are. Using () here as the place holder.
 
-        ; return () }
+        ; emitDataLits closure_label closure_rep }
 
 
 ---------------------------------------------------------------
@@ -123,6 +126,7 @@ cgTopRhsCon dflags id con args =
 
 buildDynCon :: Id                 -- Name of the thing to which this constr will
                                   -- be bound
+            -> Maybe Int
             -> Bool               -- is it genuinely bound to that name, or just
                                   -- for profiling?
             -> CostCentreStack    -- Where to grab cost centre from;
@@ -131,14 +135,15 @@ buildDynCon :: Id                 -- Name of the thing to which this constr will
             -> [NonVoid StgArg]   -- Its args
             -> FCode (CgIdInfo, FCode CmmAGraph)
                -- Return details about how to find it and initialization code
-buildDynCon binder actually_bound cc con args
+buildDynCon binder mn actually_bound cc con args
     = do dflags <- getDynFlags
-         buildDynCon' dflags (targetPlatform dflags) binder actually_bound cc con args
+         buildDynCon' dflags (targetPlatform dflags) binder mn actually_bound cc con args
 
 
 buildDynCon' :: DynFlags
              -> Platform
-             -> Id -> Bool
+             -> Id -> Maybe Int
+             -> Bool
              -> CostCentreStack
              -> DataCon
              -> [NonVoid StgArg]
@@ -165,7 +170,7 @@ premature looking at the args will cause the compiler to black-hole!
 -- which have exclusively size-zero (VoidRep) args, we generate no code
 -- at all.
 
-buildDynCon' dflags _ binder _ _cc con []
+buildDynCon' dflags _ binder _ _ _cc con []
   | isNullaryRepDataCon con
   = return (litIdInfo dflags binder (mkConLFInfo con)
                 (CmmLabel (mkClosureLabel (dataConName con) (idCafInfo binder))),
@@ -197,7 +202,7 @@ We don't support this optimisation when compiling into Windows DLLs yet
 because they don't support cross package data references well.
 -}
 
-buildDynCon' dflags platform binder _ _cc con [arg]
+buildDynCon' dflags platform binder _ _ _cc con [arg]
   | maybeIntLikeCon con
   , platformOS platform /= OSMinGW32 || not (positionIndependent dflags)
   , NonVoid (StgLitArg (LitNumber LitNumInt val _)) <- arg
@@ -211,7 +216,7 @@ buildDynCon' dflags platform binder _ _cc con [arg]
         ; return ( litIdInfo dflags binder (mkConLFInfo con) intlike_amode
                  , return mkNop) }
 
-buildDynCon' dflags platform binder _ _cc con [arg]
+buildDynCon' dflags platform binder _ _ _cc con [arg]
   | maybeCharLikeCon con
   , platformOS platform /= OSMinGW32 || not (positionIndependent dflags)
   , NonVoid (StgLitArg (LitChar val)) <- arg
@@ -226,7 +231,7 @@ buildDynCon' dflags platform binder _ _cc con [arg]
                  , return mkNop) }
 
 -------- buildDynCon': the general case -----------
-buildDynCon' dflags _ binder actually_bound ccs con args
+buildDynCon' dflags _ binder mn actually_bound ccs con args
   = do  { (id_info, reg) <- rhsIdInfo binder lf_info
         ; return (id_info, gen_code reg)
         }
@@ -234,10 +239,11 @@ buildDynCon' dflags _ binder actually_bound ccs con args
   lf_info = mkConLFInfo con
 
   gen_code reg
-    = do  { let (tot_wds, ptr_wds, args_w_offsets)
+    = do  { modu <- getModuleName
+          ; let (tot_wds, ptr_wds, args_w_offsets)
                   = mkVirtConstrOffsets dflags (addArgReps args)
                 nonptr_wds = tot_wds - ptr_wds
-                info_tbl = mkDataConInfoTable dflags con False
+                info_tbl = mkDataConInfoTable dflags con ((modu,) <$> mn) False
                                 ptr_wds nonptr_wds
           ; let ticky_name | actually_bound = Just binder
                            | otherwise = Nothing
