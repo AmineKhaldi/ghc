@@ -1522,6 +1522,7 @@ emitPrimOp dflags = \case
   NewBCOOp -> alwaysExternal
   UnpackClosureOp -> alwaysExternal
   ClosureSizeOp -> alwaysExternal
+  WhereFromOp   -> alwaysExternal
   GetApStackValOp -> alwaysExternal
   ClearCCSOp -> alwaysExternal
   TraceEventOp -> alwaysExternal
