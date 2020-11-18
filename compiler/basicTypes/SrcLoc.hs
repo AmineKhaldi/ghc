@@ -53,6 +53,7 @@ module SrcLoc (
         realSrcSpanStart, realSrcSpanEnd,
         srcSpanFileName_maybe,
         pprUserRealSpan,
+        srcSpanToRealSrcSpan,
 
         -- ** Unsafely deconstructing SrcSpan
         -- These are dubious exports, because they crash on some inputs
@@ -429,6 +430,10 @@ realSrcSpanEnd s = mkRealSrcLoc (srcSpanFile s)
 srcSpanFileName_maybe :: SrcSpan -> Maybe FastString
 srcSpanFileName_maybe (RealSrcSpan s)   = Just (srcSpanFile s)
 srcSpanFileName_maybe (UnhelpfulSpan _) = Nothing
+
+srcSpanToRealSrcSpan :: SrcSpan -> Maybe RealSrcSpan
+srcSpanToRealSrcSpan (RealSrcSpan ss) = Just ss
+srcSpanToRealSrcSpan _ = Nothing
 
 {-
 ************************************************************************

@@ -75,6 +75,7 @@ emptyHooks = Hooks
   , createIservProcessHook = Nothing
   }
 
+
 data Hooks = Hooks
   { dsForeignsHook         :: Maybe ([LForeignDecl GhcTc]
                            -> DsM (ForeignStubs, OrdList (Id, CoreExpr)))

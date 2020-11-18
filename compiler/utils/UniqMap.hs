@@ -10,7 +10,7 @@
 --
 -- Key preservation is right-biased.
 module UniqMap (
-    UniqMap,
+    UniqMap(..),
     emptyUniqMap,
     isNullUniqMap,
     unitUniqMap,

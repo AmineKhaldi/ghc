@@ -597,6 +597,8 @@ Library
         Hoopl.Label
 --        CgInfoTbls used in ghci/DebuggerUtils
 --        CgHeapery  mkVirtHeapOffsets used in ghci
+        IPE
+        GHC.Stg.Debug
 
     Exposed-Modules:
             AsmCodeGen

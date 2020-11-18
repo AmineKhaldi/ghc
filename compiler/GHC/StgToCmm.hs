@@ -15,7 +15,7 @@ module GHC.StgToCmm ( codeGen ) where
 
 import GhcPrelude as Prelude
 
-import GHC.StgToCmm.Prof (initCostCentres, ldvEnter)
+import GHC.StgToCmm.Prof (initInfoTableProv, initCostCentres, ldvEnter)
 import GHC.StgToCmm.Monad
 import GHC.StgToCmm.Env
 import GHC.StgToCmm.Bind
@@ -51,20 +51,28 @@ import OrdList
 import MkGraph
 
 import Data.IORef
-import Control.Monad (when,void)
 import Util
+import Control.Monad (forM_, when,void)
+import System.IO.Unsafe
+import qualified Data.ByteString as BS
+import UniqMap
+import IPE
+
 
 codeGen :: DynFlags
         -> Module
+        -> InfoTableProvMap
         -> [TyCon]
         -> CollectedCCs                -- (Local/global) cost-centres needing declaring/registering.
         -> [CgStgTopBinding]           -- Bindings to convert
         -> HpcInfo
+        -> IORef [CmmInfoTable]
+        -- ^ A variable to write any used info tables to if `-finfo-table-map` is turned on.
         -> Stream IO CmmGroup ()       -- Output as a stream, so codegen can
                                        -- be interleaved with output
 
-codeGen dflags this_mod data_tycons
-        cost_centre_info stg_binds hpc_info
+codeGen dflags this_mod ip_map@(InfoTableProvMap _) data_tycons
+        cost_centre_info stg_binds hpc_info lref
   = do  {     -- cg: run the code generator, and yield the resulting CmmGroup
               -- Using an IORef to store the state is a bit crude, but otherwise
               -- we would need to add a state monad layer.
@@ -89,7 +97,9 @@ codeGen dflags this_mod data_tycons
         ; cg (mkModuleInit cost_centre_info this_mod hpc_info)
 
         ; mapM_ (cg . cgTopBinding dflags) stg_binds
-
+        ; cgs <- liftIO (readIORef  cgref)
+        ; liftIO $ writeIORef lref (cgs_used_info cgs)
+        ; cg (initInfoTableProv ip_map this_mod)
                 -- Put datatype_stuff after code_stuff, because the
                 -- datatype closure table (for enumeration types) to
                 -- (say) PrelBase_True_closure, which is defined in

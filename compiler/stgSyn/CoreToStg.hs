@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, DeriveFunctor #-}
+{-# LANGUAGE CPP, DeriveFunctor, BangPatterns #-}
 
 --
 -- (c) The GRASP/AQUA Project, Glasgow University, 1993-1998
@@ -47,6 +47,9 @@ import ForeignCall
 import Demand           ( isUsedOnce )
 import PrimOp           ( PrimCall(..), primOpWrapperId )
 import SrcLoc           ( mkGeneralSrcSpan )
+import GHC.Stg.Debug
+
+import IPE
 
 import Data.List.NonEmpty (nonEmpty, toList)
 import Data.Maybe    (fromMaybe)
@@ -222,15 +225,21 @@ import Control.Monad (ap)
 -- Setting variable info: top-level, binds, RHSs
 -- --------------------------------------------------------------
 
-coreToStg :: DynFlags -> Module -> CoreProgram
-          -> ([StgTopBinding], CollectedCCs)
-coreToStg dflags this_mod pgm
-  = (pgm', final_ccs)
+
+coreToStg :: DynFlags -> Module -> ModLocation -> CoreProgram
+          -> ([StgTopBinding], InfoTableProvMap, CollectedCCs)
+coreToStg dflags this_mod ml pgm
+  = (pgm'', denv, final_ccs)
   where
     (_, (local_ccs, local_cc_stacks), pgm')
       = coreTopBindsToStg dflags this_mod emptyVarEnv emptyCollectedCCs pgm
 
     prof = WayProf `elem` ways dflags
+    (!pgm'', !denv) =
+        if gopt Opt_InfoTableMap dflags
+          then collectDebugInformation dflags ml pgm'
+          else (pgm', emptyInfoTableProvMap)
+
 
     final_ccs
       | prof && gopt Opt_AutoSccsOnIndividualCafs dflags
