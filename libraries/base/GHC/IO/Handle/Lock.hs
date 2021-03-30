@@ -20,8 +20,6 @@ import GHC.IO.Handle.Types (Handle)
 
 #if defined(mingw32_HOST_OS)
 import GHC.IO.Handle.Lock.Windows
-#elif HAVE_OFD_LOCKING
-import GHC.IO.Handle.Lock.LinuxOFD
 #elif HAVE_FLOCK
 import GHC.IO.Handle.Lock.Flock
 #else
