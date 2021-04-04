@@ -38,7 +38,9 @@ import qualified Distribution.Simple.PackageIndex              as C
 import qualified Distribution.Text                             as C
 import qualified Distribution.Types.LocalBuildInfo             as C
 import qualified Distribution.Types.MungedPackageId            as C
+#if MIN_VERSION_Cabal(3,2,0)
 import qualified Distribution.Utils.ShortText                  as C
+#endif
 #if !MIN_VERSION_Cabal(3,4,0)
 import qualified Distribution.Types.CondTree                   as C
 #endif
@@ -74,8 +76,8 @@ parsePackageData pkg = do
         deps    = nubOrd sorted \\ [name]
         depPkgs = catMaybes $ map findPackageByName deps
     return $ PackageData name version
-                         (C.fromShortText (C.synopsis pd))
-                         (C.fromShortText (C.description pd))
+                         (shortTextToString (C.synopsis pd))
+                         (shortTextToString (C.description pd))
                          depPkgs gpd
   where
     -- Collect an overapproximation of dependencies by ignoring conditionals
@@ -84,6 +86,14 @@ parsePackageData pkg = do
     collectDeps (Just (C.CondNode _ deps ifs)) = deps ++ concatMap f ifs
       where
         f (C.CondBranch _ t mt) = collectDeps (Just t) ++ collectDeps mt
+
+#if MIN_VERSION_Cabal(3,2,0)
+    shortTextToString :: C.ShortText -> String
+    shortTextToString = C.fromShortText
+#else
+    shortTextToString :: String -> String
+    shortTextToString = id
+#endif
 
 -- | Parse the package identifier from a Cabal file.
 parseCabalPkgId :: FilePath -> IO String

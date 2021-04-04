@@ -40,10 +40,15 @@ import GHC.Utils.TmpFs
 -- @process >= 1.6.9.0@).
 enableProcessJobs :: CreateProcess -> CreateProcess
 #if defined(MIN_VERSION_process)
+#if MIN_VERSION_process(1,6,9)
 enableProcessJobs opts = opts { use_process_jobs = True }
 #else
 enableProcessJobs opts = opts
 #endif
+#else
+enableProcessJobs opts = opts
+#endif
+
 
 #if !MIN_VERSION_base(4,15,0)
 -- TODO: This can be dropped with GHC 8.16
